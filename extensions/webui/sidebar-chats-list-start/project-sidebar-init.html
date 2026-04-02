@@ -26,7 +26,7 @@
           x-show="$store.chats.contexts.length > 0">
 
           <template x-for="group in $store.projectSidebar.getProjectGroups()" :key="group.key">
-            <li class="project-group" :data-project-name="group.name">
+            <li class="project-group" :class="{'project-group-active': $store.projectSidebar.isActiveGroup(group)}" :data-project-name="group.name">
 
               <!-- Project header (collapsible) -->
               <div class="project-group-header"
@@ -51,7 +51,7 @@
                     title="Finished (unseen)"></span>
                   <!-- Edit project button (only for real projects) -->
                   <button class="btn-icon-action project-edit-btn"
-                    x-show="group.key !== $store.projectSidebar.NO_PROJECT_KEY"
+                    x-show="group.key !== $store.projectSidebar.NO_PROJECT_KEY && (!$store.projectSidebar.isTouchDevice() || $store.projectSidebar.isActiveGroup(group))"
                     @click.stop="$store.projectSidebar.editProject(group.name)"
                     title="Edit project" aria-label="Edit project">
                     <span class="material-symbols-outlined">edit</span>
@@ -260,12 +260,21 @@
       opacity: 1 !important;
     }
 
-    /* Touch devices: always show edit button */
+    /* Touch devices: hide by default, show only for active project group */
+    .device-touch .project-edit-btn {
+      display: none;
+    }
+    .device-touch .project-group.project-group-active .project-edit-btn {
+      display: inline-flex;
+      opacity: 0.7;
+    }
     @media (hover: none) and (pointer: coarse) {
-      body.device-pointer .project-edit-btn {
+      .project-edit-btn {
+        display: none;
+      }
+      .project-group.project-group-active .project-edit-btn {
+        display: inline-flex;
         opacity: 0.7;
-        visibility: visible;
-        pointer-events: auto;
       }
     }
 

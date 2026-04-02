@@ -90,9 +90,9 @@ const model = {
     // Convert to array and sort groups
     const groups = Array.from(groupMap.values());
     groups.sort((a, b) => {
-      // "No Project" always last
-      if (a.key === NO_PROJECT_KEY && b.key !== NO_PROJECT_KEY) return 1;
-      if (b.key === NO_PROJECT_KEY && a.key !== NO_PROJECT_KEY) return -1;
+      // "No Project" always first
+      if (a.key === NO_PROJECT_KEY && b.key !== NO_PROJECT_KEY) return -1;
+      if (b.key === NO_PROJECT_KEY && a.key !== NO_PROJECT_KEY) return 1;
       // Otherwise sort by most recent chat descending
       return b.latestTimestamp - a.latestTimestamp;
     });
@@ -155,6 +155,27 @@ const model = {
     const chatsStore = Alpine.store("chats");
     return chatsStore && chatsStore.selected === chatId;
   },
+
+  /**
+   * Check if a group contains the currently selected chat (used for touch device edit button visibility).
+   */
+  isActiveGroup(group) {
+    const chatsStore = Alpine.store("chats");
+    if (!chatsStore || !chatsStore.selected) return false;
+    return group.chats.some((ctx) => ctx.id === chatsStore.selected);
+  },
+
+  /**
+   * Returns true when running on a touch-only device (no hover capability).
+   * More reliable than CSS class detection since it doesn't depend on A0's async body class swap.
+   */
+  isTouchDevice() {
+    return (
+      document.body.classList.contains("device-touch") ||
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches
+    );
+  },
+
 
   /**
    * Select a chat (delegates to chats store).
