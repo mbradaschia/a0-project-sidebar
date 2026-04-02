@@ -1,0 +1,407 @@
+<html>
+
+<head>
+  <script type="module">
+    import { store } from "/plugins/project_sidebar/webui/project-sidebar-store.js";
+  </script>
+</head>
+
+<body>
+  <div x-data>
+    <template x-if="$store.projectSidebar && $store.chats">
+      <div class="project-sidebar-container" x-init="$store.projectSidebar.init()">
+
+        <!-- Header row: title + new chat button -->
+        <div class="section-header-row">
+          <h3 class="section-header">Projects</h3>
+          <button id="newChatProjectSidebar" class="btn-icon-action chat-list-action-btn"
+            @click="$store.projectSidebar.newChat()"
+            aria-label="New Chat" title="New Chat">
+            <span class="material-symbols-outlined">chat_add_on</span>
+          </button>
+        </div>
+
+        <!-- Project groups list -->
+        <ul class="config-list chats-config-list project-sidebar-list no-scrollbar"
+          x-show="$store.chats.contexts.length > 0">
+
+          <template x-for="group in $store.projectSidebar.getProjectGroups()" :key="group.key">
+            <li class="project-group" :data-project-name="group.name">
+
+              <!-- Project header (collapsible) -->
+              <div class="project-group-header"
+                @click="$store.projectSidebar.toggleCollapse(group.key)">
+                <div class="project-group-header-left">
+                  <span class="material-symbols-outlined project-chevron"
+                    :class="{ 'chevron-collapsed': $store.projectSidebar.isCollapsed(group.key) }">
+                    expand_more
+                  </span>
+                  <span class="project-color-indicator"
+                    :style="group.color ? { backgroundColor: group.color } : { border: '1px solid var(--color-border)' }"></span>
+                  <span class="project-group-title" x-text="group.title"></span>
+                  <span class="project-chat-count" x-text="'(' + group.chats.length + ')'"></span>
+                </div>
+                <div class="project-group-header-actions">
+                  <!-- Status indicators — only shown when group is collapsed (marklet handles per-chat dots when expanded) -->
+                  <span class="psb-running-dot"
+                    x-show="$store.projectSidebar.isCollapsed(group.key) && $store.projectSidebar.hasRunningChat(group)"
+                    title="Running"></span>
+                  <span class="psb-unseen-dot"
+                    x-show="$store.projectSidebar.isCollapsed(group.key) && $store.projectSidebar.hasFinishedUnseenChat(group)"
+                    title="Finished (unseen)"></span>
+                  <!-- Edit project button (only for real projects) -->
+                  <button class="btn-icon-action project-edit-btn"
+                    x-show="group.key !== $store.projectSidebar.NO_PROJECT_KEY"
+                    @click.stop="$store.projectSidebar.editProject(group.name)"
+                    title="Edit project" aria-label="Edit project">
+                    <span class="material-symbols-outlined">edit</span>
+                  </button>
+                </div>
+                </div>
+              </div>
+
+              <!-- Chat items within this project -->
+              <ul class="project-group-chats"
+                x-show="!$store.projectSidebar.isCollapsed(group.key)">
+                <template x-for="context in group.chats" :key="context.id">
+                  <li>
+                    <div :class="{'chat-container': true, 'chat-selected': $store.projectSidebar.isSelected(context.id)}"
+                      :data-chat-id="context.id"
+                      :data-project-name="group.name"
+                      @click="$store.projectSidebar.selectChat(context.id)">
+                      <div class="chat-list-button">
+                        <span class="chat-name"
+                          x-text="context.name ? context.name : 'Chat #' + context.no"></span>
+                      </div>
+                      <button class="btn-icon-action chat-list-action-btn" title="Close chat"
+                        @click.stop="$confirmClick($event, () => $store.projectSidebar.killChat(context.id))">
+                        <span class="material-symbols-outlined">close</span>
+                      </button>
+                    </div>
+                  </li>
+                </template>
+              </ul>
+
+            </li>
+          </template>
+        </ul>
+
+        <!-- Empty state -->
+        <div class="empty-list-message" x-show="$store.chats.contexts.length === 0">
+          <p><i>No chats to list.</i></p>
+        </div>
+
+      </div>
+    </template>
+  </div>
+
+  <style>
+    /* ================================================================
+       HIDE DEFAULT CHATS LIST
+       The original chats-list.html content is hidden; our view replaces it.
+       We target the original component's elements specifically.
+       ================================================================ */
+    #chats-section > x-component[path*="chats-list"] > div > template + div > .section-header-row,
+    #chats-section > x-component[path*="chats-list"] > div > template + div > .chats-config-list,
+    #chats-section > x-component[path*="chats-list"] > div > template + div > .empty-list-message {
+      display: none !important;
+    }
+
+    /* Also hide the original header row and list when the store renders */
+    .chats-list-container > .section-header-row,
+    .chats-list-container > .chats-config-list:not(.project-sidebar-list),
+    .chats-list-container > .empty-list-message {
+      display: none !important;
+    }
+
+    /* ================================================================
+       PROJECT SIDEBAR CONTAINER
+       ================================================================ */
+    .project-sidebar-container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      margin-top: var(--spacing-md);
+    }
+
+    .project-sidebar-container .section-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      flex-shrink: 0;
+      margin-bottom: var(--spacing-xs);
+      z-index: 10;
+    }
+
+    .project-sidebar-container .section-header {
+      margin: 0;
+    }
+
+    .project-sidebar-list {
+      flex: 1;
+      min-height: 0;
+      overflow: scroll;
+      scroll-behavior: smooth;
+      max-height: 100%;
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* ================================================================
+       PROJECT GROUP
+       Override .config-list li { display: flex } from index.css (specificity 0,1,1)
+       We need higher specificity to force block/column layout.
+       ================================================================ */
+    .project-sidebar-list > li.project-group {
+      display: block !important;
+      align-items: initial;
+      justify-content: initial;
+      padding: 0;
+      margin-bottom: 2px;
+    }
+
+    .project-group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 6px 5px 0;
+      cursor: pointer;
+      border-radius: 4px;
+      user-select: none;
+      -webkit-user-select: none;
+      min-height: 32px;
+    }
+
+    .project-group-header:hover {
+      background-color: var(--color-background-hover);
+    }
+
+    .project-group-header-left {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow: hidden;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .project-chevron {
+      font-size: 16px;
+      transition: transform 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .chevron-collapsed {
+      transform: rotate(-90deg);
+    }
+
+    .project-color-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+      box-sizing: border-box;
+    }
+
+    .project-group-title {
+      font-size: var(--font-size-small);
+      font-weight: bold;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--color-text);
+    }
+
+    .project-chat-count {
+      font-size: 10px;
+      color: var(--color-secondary);
+      flex-shrink: 0;
+      opacity: 0.7;
+    }
+
+    /* ================================================================
+       PROJECT EDIT BUTTON (hover only on pointer devices)
+       ================================================================ */
+    .project-group-header-actions {
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .project-edit-btn {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .project-edit-btn .material-symbols-outlined {
+      font-size: 14px;
+    }
+
+    .device-pointer .project-edit-btn {
+      display: none;
+    }
+
+    .device-pointer .project-group-header:hover .project-edit-btn {
+      display: inline-flex;
+      opacity: 0.7;
+    }
+
+    .device-pointer .project-edit-btn:hover {
+      opacity: 1 !important;
+    }
+
+    /* Touch devices: always show edit button */
+    @media (hover: none) and (pointer: coarse) {
+      body.device-pointer .project-edit-btn {
+        opacity: 0.7;
+        visibility: visible;
+        pointer-events: auto;
+      }
+    }
+
+    /* ================================================================
+       PROJECT STATUS INDICATORS — matches chat_status_marklet plugin
+       ================================================================ */
+    .psb-running-dot,
+    .psb-unseen-dot {
+      display: inline-block;
+      flex-shrink: 0;
+      border-radius: 50%;
+      width: 6px;
+      height: 6px;
+      margin-right: 4px;
+    }
+
+    /* Running: pulsing blue dot — same as .csm-running-dot */
+    .psb-running-dot {
+      background-color: #4361ee;
+      box-shadow: 0 0 3px rgba(67, 97, 238, 0.6);
+      animation: csm-pulse 1.8s ease-in-out infinite;
+    }
+
+    /* Finished unseen: solid teal dot — same as .csm-unseen-dot */
+    .psb-unseen-dot {
+      background-color: #2a9d8f;
+      box-shadow: 0 0 3px rgba(42, 157, 143, 0.5);
+    }
+
+    /* Light mode adjustments — same as chat_status_marklet */
+    .light-mode .psb-running-dot {
+      background-color: #2540b3;
+      box-shadow: 0 0 3px rgba(37, 64, 179, 0.5);
+    }
+
+    .light-mode .psb-unseen-dot {
+      background-color: #1a6f65;
+      box-shadow: 0 0 3px rgba(26, 111, 101, 0.4);
+    }
+
+
+    /* ================================================================
+       CHAT ITEMS WITHIN GROUPS
+       ================================================================ */
+    .project-group-chats {
+      display: block;
+      list-style: none;
+      padding: 0;
+      margin: 0 0 0 28px;
+    }
+
+    .project-group-chats .chat-container {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 24px;
+      border-radius: 4px;
+      overflow: hidden;
+      cursor: pointer;
+    }
+
+    .project-group-chats .chat-list-button {
+      display: flex;
+      align-items: center;
+      flex-grow: 1;
+      padding: 2px 6px;
+      overflow: hidden;
+      gap: 0.4em;
+    }
+
+
+    .project-group-chats .chat-container:hover {
+      background-color: var(--color-background-hover);
+    }
+
+    .project-group-chats .chat-name {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: var(--font-size-small);
+    }
+
+
+
+    .project-group-chats .chat-list-action-btn {
+      flex-shrink: 0;
+      margin-right: 6px;
+    }
+
+    /* Selected chat accent */
+    .project-group-chats .chat-selected {
+      background-color: var(--color-background-hover);
+      border-radius: 4px;
+    }
+
+    /* Pointer: hide close button until hover */
+    .device-pointer .project-group-chats .chat-container .chat-list-action-btn {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0s;
+    }
+
+    .device-pointer .project-group-chats .chat-container:hover .chat-list-action-btn {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* Touch: always show close */
+    .device-touch .project-group-chats .chat-container .chat-list-action-btn {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+
+    /* ================================================================
+       EMPTY STATE
+       ================================================================ */
+    .project-sidebar-container .empty-list-message {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+      color: var(--color-secondary);
+      text-align: center;
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    .light-mode .project-sidebar-container .empty-list-message {
+      color: var(--color-secondary-light);
+    }
+  </style>
+</body>
+
+</html>

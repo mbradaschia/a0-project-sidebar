@@ -1,0 +1,7 @@
+name: project_sidebar
+title: Project Sidebar
+description: Replaces the default chats list with a project-grouped view. Chats are organized under collapsible project headers, sorted by most recently active. Includes edit shortcuts and interoperability data attributes.
+version: 1.0.0
+settings_sections: []
+per_project_config: false
+per_agent_config: false
