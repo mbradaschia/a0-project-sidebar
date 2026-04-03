@@ -1,4 +1,5 @@
 import { createStore } from "/js/AlpineStore.js";
+import { sendJsonData, toastFetchError } from "/index.js";
 
 const STORAGE_KEY = "projectSidebar_collapsed";
 const NO_PROJECT_KEY = "__no_project__";
@@ -35,10 +36,76 @@ const model = {
   _collapsed: {},
   _initialized: false,
 
+  /** Currently open chat context menu — null when closed */
+  openChatContext: null,
+  /** CSS style string (right/top) for the fixed dropdown panel */
+  chatMenuStyle: "",
+  /** Dynamically registered menu items — any plugin can call registerChatMenuItem() */
+  chatMenuItems: [],
+
   init() {
     if (this._initialized) return;
     this._initialized = true;
     this._collapsed = loadCollapsedState();
+    // Single global listener — closes the chat menu on any outside click.
+    // Using document (not window) avoids Alpine @click.window per-item flooding.
+    document.addEventListener("click", () => {
+      if (this.openChatContext) this.closeChatMenu();
+    });
+    // Pre-register built-in and known-plugin menu items after all stores are loaded
+    setTimeout(() => this._registerDefaultMenuItems(), 200);
+  },
+
+  /** Open the more-actions dropdown for a chat item. */
+  openChatMenu(context, btn) {
+    const r = btn.getBoundingClientRect();
+    this.chatMenuStyle =
+      "right:" + (window.innerWidth - r.right) + "px;" +
+      "top:" + (r.bottom + 2) + "px;";
+    // Toggle: clicking same button again closes it
+    this.openChatContext =
+      this.openChatContext?.id === context.id ? null : context;
+  },
+
+  /** Close the more-actions dropdown. */
+  closeChatMenu() {
+    this.openChatContext = null;
+  },
+
+  /** Register a menu item into the chat context dropdown.
+   * item: { label, icon, order, danger, visible(ctx), action(ctx) }
+   * Use { divider: true, order, label: '__dividerN__' } for separator lines.
+   */
+  registerChatMenuItem(item) {
+    this.chatMenuItems.push(item);
+    this.chatMenuItems.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  },
+
+  /** Pre-register built-in A0 actions and known plugin items. Called once on init. */
+  _registerDefaultMenuItems() {
+    // -- Known plugins (registered only if their store is present) --
+    if (Alpine.store("chatRename")) {
+      this.registerChatMenuItem({ label: "Rename", icon: "edit", order: 10,
+        action: (ctx) => Alpine.store("chatRename").openRenameModal(ctx.id) });
+    }
+    if (Alpine.store("chatArchive")) {
+      this.registerChatMenuItem({ label: "Archive", icon: "archive", order: 20,
+        visible: (ctx) => !Alpine.store("chatArchive").isArchived(ctx.id),
+        action: (ctx) => Alpine.store("chatArchive").archiveChat(ctx.id, ctx.name) });
+      this.registerChatMenuItem({ label: "Unarchive", icon: "unarchive", order: 21,
+        visible: (ctx) => Alpine.store("chatArchive").isArchived(ctx.id),
+        action: (ctx) => Alpine.store("chatArchive").unarchiveChat(ctx.id) });
+    }
+    // -- Built-in A0 actions (always present) --
+    this.registerChatMenuItem({ label: "Branch chat", icon: "fork_right", order: 30,
+      action: (ctx) => this.branchChat(ctx.id) });
+    this.registerChatMenuItem({ divider: true, label: "__divider_danger__", order: 89 });
+    this.registerChatMenuItem({ label: "Terminate & delete", icon: "stop_circle", order: 90, danger: true, confirm: true,
+      visible: (ctx) => ctx.running,
+      action: (ctx) => this.killChat(ctx.id) });
+    this.registerChatMenuItem({ label: "Delete chat", icon: "delete", order: 91, danger: true, confirm: true,
+      visible: (ctx) => !ctx.running,
+      action: (ctx) => this.killChat(ctx.id) });
   },
 
   /**
@@ -199,6 +266,58 @@ const model = {
   newChat() {
     const chatsStore = Alpine.store("chats");
     if (chatsStore) chatsStore.newChat();
+  },
+
+  /**
+   * Create a new chat inside a specific project group.
+   * Two-step approach:
+   *   1. Create a new chat via /chat_create
+   *   2. Immediately activate the project on it via /projects?action=activate
+   * This is reliable regardless of chat_inherit_project setting or existing chat state.
+   */
+  async newChatInProject(group) {
+    const chatsStore = Alpine.store("chats");
+    if (!chatsStore) return;
+
+    // For the "No Project" group, fall back to the default new-chat behaviour.
+    if (group.key === NO_PROJECT_KEY) {
+      chatsStore.newChat();
+      return;
+    }
+
+    try {
+      // Step 1: create a new chat
+      const createResp = await sendJsonData("/chat_create", {
+        current_context: chatsStore.selected || "",
+      });
+      if (!createResp || !createResp.ok) return;
+
+      const newCtxId = createResp.ctxid;
+
+      // Step 2: directly activate the project on the new chat
+      await sendJsonData("/projects", {
+        action: "activate",
+        context_id: newCtxId,
+        name: group.name,
+      });
+
+      // Select the new chat (sidebar will update reactively)
+      chatsStore.selectChat(newCtxId);
+    } catch (e) {
+      toastFetchError("Error creating chat in project", e);
+    }
+  },
+
+  async branchChat(contextId) {
+    try {
+      const res = await sendJsonData("/plugins/project_sidebar/branch_from_end", { context_id: contextId });
+      if (res?.ok) {
+        const chatsStore = Alpine.store("chats");
+        if (chatsStore) chatsStore.selectChat(res.ctxid);
+      }
+    } catch (e) {
+      toastFetchError("Error branching chat", e);
+    }
   },
 
   /**

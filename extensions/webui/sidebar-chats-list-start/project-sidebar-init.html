@@ -49,6 +49,13 @@
                   <span class="psb-unseen-dot"
                     x-show="$store.projectSidebar.isCollapsed(group.key) && $store.projectSidebar.hasFinishedUnseenChat(group)"
                     title="Finished (unseen)"></span>
+                  <!-- New chat in project button (only for real projects) -->
+                  <button class="btn-icon-action project-new-chat-btn"
+                    x-show="!$store.projectSidebar.isTouchDevice() || $store.projectSidebar.isActiveGroup(group)"
+                    @click.stop="$store.projectSidebar.newChatInProject(group)"
+                    title="New chat in project" aria-label="New chat in project">
+                    <span class="material-symbols-outlined">add_comment</span>
+                  </button>
                   <!-- Edit project button (only for real projects) -->
                   <button class="btn-icon-action project-edit-btn"
                     x-show="group.key !== $store.projectSidebar.NO_PROJECT_KEY && (!$store.projectSidebar.isTouchDevice() || $store.projectSidebar.isActiveGroup(group))"
@@ -72,9 +79,11 @@
                         <span class="chat-name"
                           x-text="context.name ? context.name : 'Chat #' + context.no"></span>
                       </div>
-                      <button class="btn-icon-action chat-list-action-btn" title="Close chat"
-                        @click.stop="$confirmClick($event, () => $store.projectSidebar.killChat(context.id))">
-                        <span class="material-symbols-outlined">close</span>
+                      <!-- 3-dot more button — triggers store-managed global dropdown -->
+                      <button class="btn-icon-action chat-list-action-btn chat-more-btn"
+                        title="More actions"
+                        @click.stop="$store.projectSidebar.openChatMenu(context, $el)">
+                        <span class="material-symbols-outlined">more_horiz</span>
                       </button>
                     </div>
                   </li>
@@ -89,6 +98,36 @@
         <div class="empty-list-message" x-show="$store.chats.contexts.length === 0">
           <p><i>No chats to list.</i></p>
         </div>
+
+        <!-- Global chat-actions dropdown — single instance, store-managed position -->
+        <div class="psb-chat-menu"
+          x-show="$store.projectSidebar.openChatContext !== null"
+          :style="$store.projectSidebar.chatMenuStyle"
+          @click.stop>
+          <template x-if="$store.projectSidebar.openChatContext !== null">
+            <div>
+              <template x-for="item in $store.projectSidebar.chatMenuItems" :key="item.label">
+                <div style="display:contents">
+                  <!-- Divider -->
+                  <div x-show="item.divider" class="psb-menu-divider"></div>
+                  <!-- Action button -->
+                  <button
+                    x-show="!item.divider && (!item.visible || item.visible($store.projectSidebar.openChatContext))"
+                    class="chat-more-item"
+                    :class="{ 'chat-more-item-danger': item.danger }"
+                    @click.stop="
+                      let ctx = $store.projectSidebar.openChatContext;
+                      item.confirm
+                        ? $confirmClick($event, () => { $store.projectSidebar.closeChatMenu(); item.action(ctx); })
+                        : ($store.projectSidebar.closeChatMenu(), item.action(ctx))">
+                    <span class="material-symbols-outlined" x-text="item.icon"></span>
+                    <span x-text="item.label"></span>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </template>
+
 
       </div>
     </template>
@@ -277,6 +316,51 @@
       }
     }
 
+    .project-new-chat-btn {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .project-new-chat-btn .material-symbols-outlined {
+      font-size: 14px;
+    }
+
+    .device-pointer .project-new-chat-btn {
+      display: none;
+    }
+
+    .device-pointer .project-group-header:hover .project-new-chat-btn {
+      display: inline-flex;
+      opacity: 0.7;
+    }
+
+    .device-pointer .project-new-chat-btn:hover {
+      opacity: 1 !important;
+    }
+
+    .device-touch .project-new-chat-btn {
+      display: none;
+    }
+    .device-touch .project-group.project-group-active .project-new-chat-btn {
+      display: inline-flex;
+      opacity: 0.7;
+    }
+    @media (hover: none) and (pointer: coarse) {
+      .project-new-chat-btn {
+        display: none;
+      }
+      .project-group.project-group-active .project-new-chat-btn {
+        display: inline-flex;
+        opacity: 0.7;
+      }
+    }
+
+
     /* ================================================================
        PROJECT STATUS INDICATORS — matches chat_status_marklet plugin
        ================================================================ */
@@ -324,7 +408,6 @@
       padding: 0;
       margin: 0 0 0 28px;
     }
-
     .project-group-chats .chat-container {
       position: relative;
       display: flex;
@@ -371,26 +454,75 @@
       border-radius: 4px;
     }
 
-    /* Pointer: hide close button until hover */
-    .device-pointer .project-group-chats .chat-container .chat-list-action-btn {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity 0s;
+    /* Hide all chat action buttons by default; show only .chat-more-btn on hover.
+       Must override chat_rename's !important rules (specificity 0,2,1) with
+       higher specificity (0,3,2) + !important. */
+    .project-group-chats .chat-container .chat-list-action-btn:not(.chat-more-btn) {
+      display: none !important;
+    }
+    .project-group-chats .chat-container:hover .chat-list-action-btn:not(.chat-more-btn),
+    .project-group-chats .chat-container:focus-within .chat-list-action-btn:not(.chat-more-btn) {
+      display: none !important;
     }
 
-    .device-pointer .project-group-chats .chat-container:hover .chat-list-action-btn {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
+
+    /* ================================================================
+       CHAT MORE DROPDOWN (global fixed-position panel)
+       ================================================================ */
+    /* ================================================================
+       CHAT MORE DROPDOWN (global fixed-position panel)
+       ================================================================ */
+    .psb-chat-menu {
+      position: fixed;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 4px;
+      min-width: 140px;
+      z-index: 9999;
+      box-shadow: 0 4px 16px var(--color-border);
     }
 
-    /* Touch: always show close */
-    .device-touch .project-group-chats .chat-container .chat-list-action-btn {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
+
+    .chat-more-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+      padding: 5px 8px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--color-text);
+      font-size: var(--font-size-small);
+      cursor: pointer;
+      white-space: nowrap;
+      text-align: left;
     }
+
+    .chat-more-item:hover {
+      background: var(--color-background-hover);
+    }
+
+    .psb-menu-divider {
+      border-top: 1px solid var(--color-border);
+      margin: 4px 0;
+    }
+
+    .chat-more-item-danger {
+      color: var(--color-error-text);
+    }
+
+    .chat-more-item-danger:hover {
+      background: color-mix(in srgb, var(--color-error-text) 15%, transparent);
+    }
+
+
+    .chat-more-item .material-symbols-outlined {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
 
     /* ================================================================
        EMPTY STATE
