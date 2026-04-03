@@ -3,7 +3,11 @@ from helpers.api import ApiHandler, Input, Output, Request, Response
 from helpers import files
 from agent import AgentContext
 import helpers.persist_chat as persist_chat
-from plugins._chat_branching.api.branch_chat import BranchChat
+try:
+    from plugins._chat_branching.api.branch_chat import BranchChat
+    _BRANCH_AVAILABLE = True
+except ImportError:
+    _BRANCH_AVAILABLE = False
 
 
 class BranchFromEnd(ApiHandler):
@@ -13,6 +17,8 @@ class BranchFromEnd(ApiHandler):
     """
 
     async def process(self, input: Input, request: Request) -> Output:
+        if not _BRANCH_AVAILABLE:
+            return Response("Branch chat requires the _chat_branching plugin to be installed", 503)
         context_id = input.get("context_id", "")
         if not context_id:
             return Response("Missing context_id", 400)

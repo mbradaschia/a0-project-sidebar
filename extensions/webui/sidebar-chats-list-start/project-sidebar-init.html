@@ -134,6 +134,16 @@
   </div>
 
   <style>
+    /* Status dot semantic color tokens — override these to re-theme */
+    :root {
+      --psb-running-color: #4361ee;
+      --psb-unseen-color: #2a9d8f;
+    }
+    .light-mode {
+      --psb-running-color: #2540b3;
+      --psb-unseen-color: #1a6f65;
+    }
+
     /* ================================================================
        HIDE DEFAULT CHATS LIST
        The original chats-list.html content is hidden; our view replaces it.
@@ -376,26 +386,15 @@
 
     /* Running: pulsing blue dot — same as .csm-running-dot */
     .psb-running-dot {
-      background-color: #4361ee;
-      box-shadow: 0 0 3px rgba(67, 97, 238, 0.6);
+      background-color: var(--psb-running-color);
+      box-shadow: 0 0 3px color-mix(in srgb, var(--psb-running-color) 60%, transparent);
       animation: csm-pulse 1.8s ease-in-out infinite;
     }
 
     /* Finished unseen: solid teal dot — same as .csm-unseen-dot */
     .psb-unseen-dot {
-      background-color: #2a9d8f;
-      box-shadow: 0 0 3px rgba(42, 157, 143, 0.5);
-    }
-
-    /* Light mode adjustments — same as chat_status_marklet */
-    .light-mode .psb-running-dot {
-      background-color: #2540b3;
-      box-shadow: 0 0 3px rgba(37, 64, 179, 0.5);
-    }
-
-    .light-mode .psb-unseen-dot {
-      background-color: #1a6f65;
-      box-shadow: 0 0 3px rgba(26, 111, 101, 0.4);
+      background-color: var(--psb-unseen-color);
+      box-shadow: 0 0 3px color-mix(in srgb, var(--psb-unseen-color) 50%, transparent);
     }
 
 
