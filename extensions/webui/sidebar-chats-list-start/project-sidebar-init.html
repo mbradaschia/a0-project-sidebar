@@ -82,7 +82,8 @@
                       <!-- 3-dot more button — triggers store-managed global dropdown -->
                       <button class="btn-icon-action chat-list-action-btn chat-more-btn"
                         title="More actions"
-                        @click.stop="$store.projectSidebar.openChatMenu(context, $el)">
+                        @click.stop="$store.projectSidebar.openChatMenu(context, $el)"
+                        @touchstart.stop="$store.projectSidebar.openChatMenu(context, $el)">
                         <span class="material-symbols-outlined">more_horiz</span>
                       </button>
                     </div>
@@ -462,6 +463,15 @@
     .project-group-chats .chat-container:hover .chat-list-action-btn:not(.chat-more-btn),
     .project-group-chats .chat-container:focus-within .chat-list-action-btn:not(.chat-more-btn) {
       display: none !important;
+
+    /* Always show the 3-dot menu button on touch devices (no hover) */
+    @media (hover: none) and (pointer: coarse) {
+      .project-group-chats .chat-container .chat-more-btn {
+        display: inline-flex !important;
+      }
+    }
+    .device-touch .project-group-chats .chat-container .chat-more-btn {
+      display: inline-flex !important;
     }
 
 

@@ -35,6 +35,7 @@ function toTimestamp(val) {
 const model = {
   _collapsed: {},
   _initialized: false,
+  _skipClose: false,
 
   /** Currently open chat context menu — null when closed */
   openChatContext: null,
@@ -49,8 +50,14 @@ const model = {
     this._collapsed = loadCollapsedState();
     // Single global listener — closes the chat menu on any outside click.
     // Using document (not window) avoids Alpine @click.window per-item flooding.
-    document.addEventListener("click", () => {
-      if (this.openChatContext) this.closeChatMenu();
+    document.addEventListener("click", (e) => {
+      if (this._skipClose) return;
+      if (this.openChatContext) {
+        const menu = document.querySelector(".psb-chat-menu");
+        if (menu && menu.contains(e.target)) return;
+        if (e.target.closest(".chat-more-btn")) return;
+        this.closeChatMenu();
+      }
     });
     // Pre-register built-in and known-plugin menu items after all stores are loaded
     setTimeout(() => this._registerDefaultMenuItems(), 200);
@@ -65,8 +72,10 @@ const model = {
     // Toggle: clicking same button again closes it
     this.openChatContext =
       this.openChatContext?.id === context.id ? null : context;
+    // Guard against synthesized click on mobile (touchstart→click race)
+    this._skipClose = true;
+    setTimeout(() => { this._skipClose = false; }, 150);
   },
-
   /** Close the more-actions dropdown. */
   closeChatMenu() {
     this.openChatContext = null;
