@@ -35,7 +35,6 @@ function toTimestamp(val) {
 const model = {
   _collapsed: {},
   _initialized: false,
-  _skipClose: false,
 
   /** Currently open chat context menu — null when closed */
   openChatContext: null,
@@ -48,10 +47,9 @@ const model = {
     if (this._initialized) return;
     this._initialized = true;
     this._collapsed = loadCollapsedState();
-    // Single global listener — closes the chat menu on any outside click.
-    // Using document (not window) avoids Alpine @click.window per-item flooding.
-    document.addEventListener("click", (e) => {
-      if (this._skipClose) return;
+    // Single global listener — closes the chat menu on any outside pointer-down.
+    // pointerdown fires before click on both mouse and touch — no race conditions.
+    document.addEventListener("pointerdown", (e) => {
       if (this.openChatContext) {
         const menu = document.querySelector(".psb-chat-menu");
         if (menu && menu.contains(e.target)) return;
@@ -72,9 +70,6 @@ const model = {
     // Toggle: clicking same button again closes it
     this.openChatContext =
       this.openChatContext?.id === context.id ? null : context;
-    // Guard against synthesized click on mobile (touchstart→click race)
-    this._skipClose = true;
-    setTimeout(() => { this._skipClose = false; }, 150);
   },
   /** Close the more-actions dropdown. */
   closeChatMenu() {
@@ -332,6 +327,12 @@ const model = {
   /**
    * Constant for no-project key.
    */
+  /** Check if a group contains the selected chat. */
+  isActiveChat(context) {
+    const chatsStore = Alpine.store("chats");
+    return chatsStore && chatsStore.selected === context.id;
+  },
+
   get NO_PROJECT_KEY() {
     return NO_PROJECT_KEY;
   },
