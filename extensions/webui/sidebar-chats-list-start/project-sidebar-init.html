@@ -83,6 +83,7 @@
                       <button class="btn-icon-action chat-list-action-btn chat-more-btn"
                         x-show="!$store.projectSidebar.isTouchDevice() || $store.projectSidebar.isActiveChat(context)"
                         title="More actions"
+                        @click.stop
                         @pointerdown.stop.prevent="$store.projectSidebar.openChatMenu(context, $el)">
                         <span class="material-symbols-outlined">more_vert</span>
                       </button>
