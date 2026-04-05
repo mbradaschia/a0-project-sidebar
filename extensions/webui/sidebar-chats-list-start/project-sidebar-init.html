@@ -22,7 +22,7 @@
         </div>
 
         <!-- Project groups list -->
-        <ul class="config-list chats-config-list project-sidebar-list no-scrollbar"
+        <ul class="config-list project-sidebar-list no-scrollbar"
           x-show="$store.chats.contexts.length > 0">
 
           <template x-for="group in $store.projectSidebar.getProjectGroups()" :key="group.key">
@@ -84,7 +84,7 @@
                         x-show="!$store.projectSidebar.isTouchDevice() || $store.projectSidebar.isActiveChat(context)"
                         title="More actions"
                         @pointerdown.stop.prevent="$store.projectSidebar.openChatMenu(context, $el)">
-                        <span class="material-symbols-outlined">more_horiz</span>
+                        <span class="material-symbols-outlined">more_vert</span>
                       </button>
                     </div>
                   </li>
@@ -454,7 +454,7 @@
       border-radius: 4px;
     }
 
-    /* Hide all chat action buttons by default; show only .chat-more-btn on hover.
+    /* Hide all chat action buttons except .chat-more-btn.
        Must override chat_rename's !important rules (specificity 0,2,1) with
        higher specificity (0,3,2) + !important. */
     .project-group-chats .chat-container .chat-list-action-btn:not(.chat-more-btn) {
@@ -463,6 +463,7 @@
     .project-group-chats .chat-container:hover .chat-list-action-btn:not(.chat-more-btn),
     .project-group-chats .chat-container:focus-within .chat-list-action-btn:not(.chat-more-btn) {
       display: none !important;
+    }
 
     /* Always show the 3-dot menu button on touch devices (no hover) */
     @media (hover: none) and (pointer: coarse) {
@@ -472,6 +473,34 @@
     }
     .device-touch .project-group-chats .chat-container .chat-more-btn {
       display: inline-flex !important;
+    }
+
+    /* Mobile: chat_rename hides all .chat-list-action-btn and only restores
+       its own .chat-more-actions-btn class. Our .chat-more-btn stays hidden.
+       Show only on the selected chat, and keep it compact (chat_rename inflates
+       mobile buttons to 36px/22px — we cap them at sidebar-header size).
+       Override with higher specificity (0,4,1) > chat_rename's (0,3,1). */
+    @media (hover: none) and (pointer: coarse) {
+      body.device-pointer .project-group-chats .chat-container.chat-selected .chat-more-btn {
+        display: inline-flex !important;
+        width: 22px !important;
+        height: 22px !important;
+        min-width: 22px !important;
+        margin-right: 4px !important;
+      }
+      body.device-pointer .project-group-chats .chat-container.chat-selected .chat-more-btn .material-symbols-outlined {
+        font-size: 14px !important;
+      }
+    }
+    .device-touch .project-group-chats .chat-container.chat-selected .chat-more-btn {
+      display: inline-flex !important;
+      width: 22px !important;
+      height: 22px !important;
+      min-width: 22px !important;
+      margin-right: 4px !important;
+    }
+    .device-touch .project-group-chats .chat-container.chat-selected .chat-more-btn .material-symbols-outlined {
+      font-size: 14px !important;
     }
 
 

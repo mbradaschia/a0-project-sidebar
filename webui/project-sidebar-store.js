@@ -252,6 +252,9 @@ const model = {
    * Select a chat (delegates to chats store).
    */
   selectChat(chatId) {
+    // Close the dropdown first so the menu dismiss doesn't race with the
+    // focus/resize chain that selectChat triggers on mobile.
+    if (this.openChatContext) this.closeChatMenu();
     const chatsStore = Alpine.store("chats");
     if (chatsStore) chatsStore.selectChat(chatId);
   },

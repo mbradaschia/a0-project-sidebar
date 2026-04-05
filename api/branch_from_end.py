@@ -47,4 +47,4 @@ class BranchFromEnd(ApiHandler):
 
         # Delegate to BranchChat with the last log item's number
         fake_input = {"context": context_id, "log_no": last_no}
-        return await BranchChat().process(fake_input, request)
+        return await BranchChat(self.app, self.thread_lock).process(fake_input, request)
