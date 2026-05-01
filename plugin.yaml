@@ -1,6 +1,6 @@
 name: project_sidebar
 title: Project Sidebar
-description: Replaces the default chats list with a project-grouped view. Chats are organized under collapsible project headers, sorted by most recently active. Includes edit shortcuts and interoperability data attributes.
+description: Replaces the default chats list with a project-grouped view (collapsible groups, recency sorting, edit shortcuts, interoperability data attributes). Adds a "branch chat" entry to the chat context menu via a thin in-memory wrapper around the _chat_branching plugin. No disk reads; no new persisted state.
 version: 1.0.0
 settings_sections: []
 per_project_config: false

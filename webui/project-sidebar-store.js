@@ -277,10 +277,11 @@ const model = {
 
   /**
    * Create a new chat inside a specific project group.
-   * Two-step approach:
-   *   1. Create a new chat via /chat_create
-   *   2. Immediately activate the project on it via /projects?action=activate
-   * This is reliable regardless of chat_inherit_project setting or existing chat state.
+   * Respects the core `chat_inherit_project` setting: when core will already
+   * auto-assign the right project on create (setting is on AND the seed chat
+   * is already in the target group), we skip the explicit /projects override.
+   * When the user's clicked project differs from what core would inherit,
+   * the click is treated as an explicit choice and we activate the project.
    */
   async newChatInProject(group) {
     const chatsStore = Alpine.store("chats");
@@ -293,7 +294,14 @@ const model = {
     }
 
     try {
-      // Step 1: create a new chat
+      const inheritProject = await this._getInheritProjectSetting();
+      const seedChat = Array.isArray(chatsStore.contexts)
+        ? chatsStore.contexts.find((c) => c.id === chatsStore.selected)
+        : null;
+      const seedProjectName = seedChat?.project?.name;
+      const willAutoInherit =
+        inheritProject === true && seedProjectName === group.name;
+
       const createResp = await sendJsonData("/chat_create", {
         current_context: chatsStore.selected || "",
       });
@@ -301,25 +309,89 @@ const model = {
 
       const newCtxId = createResp.ctxid;
 
-      // Step 2: directly activate the project on the new chat
-      await sendJsonData("/projects", {
-        action: "activate",
-        context_id: newCtxId,
-        name: group.name,
-      });
+      if (!willAutoInherit) {
+        await sendJsonData("/projects", {
+          action: "activate",
+          context_id: newCtxId,
+          name: group.name,
+        });
+      }
 
-      // Select the new chat (sidebar will update reactively)
       chatsStore.selectChat(newCtxId);
     } catch (e) {
       toastFetchError("Error creating chat in project", e);
     }
   },
 
-  async branchChat(contextId) {
+  _inheritProjectCache: null,
+
+  /** Resolve the chat_inherit_project setting, preferring an in-page store
+   * if available, otherwise fetching /get_settings once and caching. */
+  async _getInheritProjectSetting() {
+    if (this._inheritProjectCache !== null) return this._inheritProjectCache;
+    const fromStore = this._readInheritFromStore();
+    if (typeof fromStore === "boolean") {
+      this._inheritProjectCache = fromStore;
+      return fromStore;
+    }
     try {
-      const res = await sendJsonData("/plugins/project_sidebar/branch_from_end", { context_id: contextId });
+      const resp = await sendJsonData("/get_settings", {});
+      const found = this._findSettingValue(resp, "chat_inherit_project");
+      this._inheritProjectCache = found === true;
+    } catch (_e) {
+      // Safe default: keep the previous always-override behaviour rather
+      // than silently dropping the project assignment.
+      this._inheritProjectCache = false;
+    }
+    return this._inheritProjectCache;
+  },
+
+  _readInheritFromStore() {
+    const settingsStore = Alpine.store("settings");
+    if (!settingsStore) return undefined;
+    const candidates = [
+      settingsStore.chat_inherit_project,
+      settingsStore.values?.chat_inherit_project,
+      settingsStore.settings?.chat_inherit_project,
+    ];
+    return candidates.find((v) => typeof v === "boolean");
+  },
+
+  _findSettingValue(obj, key) {
+    if (!obj || typeof obj !== "object") return undefined;
+    if (key in obj && typeof obj[key] !== "object") return obj[key];
+    for (const v of Object.values(obj)) {
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item && typeof item === "object" && item.id === key) {
+            return item.value;
+          }
+          const nested = this._findSettingValue(item, key);
+          if (nested !== undefined) return nested;
+        }
+      } else if (v && typeof v === "object") {
+        const nested = this._findSettingValue(v, key);
+        if (nested !== undefined) return nested;
+      }
+    }
+    return undefined;
+  },
+
+  async branchChat(contextId) {
+    const chatsStore = Alpine.store("chats");
+    // Branching requires the chat in memory. selectChat triggers a load
+    // via core's normal mechanism; we yield one tick so the request can
+    // register the context before the branch call hits the backend.
+    if (chatsStore && chatsStore.selected !== contextId) {
+      chatsStore.selectChat(contextId);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    try {
+      const res = await sendJsonData(
+        "/plugins/project_sidebar/branch_from_end",
+        { context_id: contextId },
+      );
       if (res?.ok) {
-        const chatsStore = Alpine.store("chats");
         if (chatsStore) chatsStore.selectChat(res.ctxid);
       }
     } catch (e) {
