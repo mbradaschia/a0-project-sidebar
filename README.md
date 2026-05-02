@@ -73,7 +73,7 @@ This plugin integrates with the [Chat Status Marklet](https://github.com/mbradas
 
 ## Version
 
-1.0.0
+1.0.1
 
 ## License
 
