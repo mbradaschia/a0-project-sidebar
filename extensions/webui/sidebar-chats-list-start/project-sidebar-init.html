@@ -478,30 +478,39 @@
 
     /* Mobile: chat_rename hides all .chat-list-action-btn and only restores
        its own .chat-more-actions-btn class. Our .chat-more-btn stays hidden.
-       Show only on the selected chat, and keep it compact (chat_rename inflates
-       mobile buttons to 36px/22px — we cap them at sidebar-header size).
-       Override with higher specificity (0,4,1) > chat_rename's (0,3,1). */
+       chat_rename's compact-sidebar-buttons branch also inflates any visible
+       .chat-list-action-btn to 36px/22px on touch — we must cap our
+       .chat-more-btn at the sidebar-header size for ALL chats (selected or
+       not), otherwise non-selected rows render the larger inherited size
+       while the selected row gets the compact override, producing the
+       inconsistent menu icon sizes reported in the sidebar.
+       Override with higher specificity (0,3,2) > chat_rename's (0,3,1). */
     @media (hover: none) and (pointer: coarse) {
-      body.device-pointer .project-group-chats .chat-container.chat-selected .chat-more-btn {
-        display: inline-flex !important;
+      body.device-pointer .project-group-chats .chat-container .chat-more-btn {
         width: 22px !important;
         height: 22px !important;
         min-width: 22px !important;
         margin-right: 4px !important;
       }
-      body.device-pointer .project-group-chats .chat-container.chat-selected .chat-more-btn .material-symbols-outlined {
+      body.device-pointer .project-group-chats .chat-container .chat-more-btn .material-symbols-outlined {
         font-size: 14px !important;
       }
+      /* Selected row: also force visible (chat_rename hides via !important) */
+      body.device-pointer .project-group-chats .chat-container.chat-selected .chat-more-btn {
+        display: inline-flex !important;
+      }
     }
-    .device-touch .project-group-chats .chat-container.chat-selected .chat-more-btn {
-      display: inline-flex !important;
+    .device-touch .project-group-chats .chat-container .chat-more-btn {
       width: 22px !important;
       height: 22px !important;
       min-width: 22px !important;
       margin-right: 4px !important;
     }
-    .device-touch .project-group-chats .chat-container.chat-selected .chat-more-btn .material-symbols-outlined {
+    .device-touch .project-group-chats .chat-container .chat-more-btn .material-symbols-outlined {
       font-size: 14px !important;
+    }
+    .device-touch .project-group-chats .chat-container.chat-selected .chat-more-btn {
+      display: inline-flex !important;
     }
 
 
